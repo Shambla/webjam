@@ -4,8 +4,8 @@ import threading
 import time
 import requests
 import slack
+import shutil
 import sys
-import tempfile
 import recording
 
 connected = False
@@ -13,8 +13,6 @@ connected = False
 start = time.time()
 # time in seconds before crapping out
 timeout = 2
-# jam channel
-channel_id = 'GK6TLC48P'
 
 on_air = False
 
@@ -46,18 +44,20 @@ def on_stop_record():
     global on_air
     on_air = False
 
+    mp3_filename = recording.convert(filename)
+
     print('Uploading to Slack channel ', end='')
     t = threading.Thread(target=spin, args=(spin_check,))
     t.start()
 
     my_file = {
-      'file': (filename, open(filename, 'rb'), 'wav')
+      'file': (mp3_filename, open(mp3_filename, 'rb'), 'wav')
     }
 
     payload = {
         "channels": [channel_id],
         'initial_comment': '...and there it is',
-        "filename": filename,
+        "filename": mp3_filename,
         'title': 'Latest Jam',
         "token": token,
     }
@@ -104,7 +104,7 @@ def on_message(**payload):
             web_client.chat_postMessage(
                 channel=channel_id,
                 icon_emoji=':metal:',
-                text='Let\'s call it a day. I\'m preparing that hot mix for consumption!'
+                text='Nicely done. I\'m preparing that hot mix for consumption!'
             )
 
             on_stop_record()
@@ -114,6 +114,20 @@ def on_message(**payload):
                 icon_emoji=':metal:',
                 text='Was I supposed to be recording? Whoops...'
             )
+    elif '!disk' in data['text']:
+        total, used, free = shutil.disk_usage(".")
+        web_client.chat_postMessage(
+            channel=channel_id,
+            icon_emoji=':metal:',
+            text='Let me check on that disk space. {:.2f} % used, {:.1f} gigs left.'.format(used / total, free / 1024 / 1024 / 1024)
+        )
+    elif '!cleanup' in data['text']:
+        removed = recording.cleanup()
+        web_client.chat_postMessage(
+            channel=channel_id,
+            icon_emoji=':metal:',
+            text='Let me clean that up for you. {} file(s) removed.'.format(removed)
+        )
     elif '!shutdown' in data['text']:
         web_client.chat_postMessage(
             channel=channel_id,
@@ -128,6 +142,8 @@ def init():
     config.read('config.ini')
     global token
     token = config['slack']['token']
+    global channel_id
+    channel_id = config['slack']['channel']
 
     print('Plugging into the Slack channel ', end='')
     t = threading.Thread(target=spin, args=(spin_check,))

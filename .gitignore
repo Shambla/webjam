@@ -108,3 +108,4 @@ config.ini
 
 # generated files
 *.wav
+*.mp3
