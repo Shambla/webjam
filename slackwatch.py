@@ -95,7 +95,7 @@ def on_message(**payload):
             web_client.chat_postMessage(
                 channel=channel_id,
                 icon_emoji=':metal:',
-                text='Let\'s rock!'
+                text='Let\'s rock! I\'m recording as we speak.'
             )
 
             on_record()
