@@ -35,6 +35,8 @@ Do not trust my Python
 This application looks for a config.ini file in the current directory which should contain the
 following information:
 
+```
 [slack]
 token = {your slack authentication token}
 channel = {the slack channel ID}
+```
