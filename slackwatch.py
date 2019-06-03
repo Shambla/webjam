@@ -6,48 +6,62 @@ import requests
 import slack
 import shutil
 import sys
-import recording
+import audio
 
+# whether or not the application has connected to Slack
 connected = False
-# time of first connect
-start = time.time()
-# time in seconds before crapping out
-timeout = 2
-
+# whether or not the application is actively recording
 on_air = False
 
 
-def spin_check():
-    if connected:
-        print('PLUGGED IN')
-        return False
-    elif time.time() - start > timeout:
-        print('Bummer, could not connect')
-        sys.exit(-1)
-    return True
+def post_message(web_client, message):
+    """
+    Posts the provided message to the default Slack channel
 
-
-def is_on_air():
-    return on_air
+    :param web_client: the Slack web client
+    :param message: the message to post
+    :return: nothing
+    """
+    web_client.chat_postMessage(
+        channel=channel_id,
+        icon_emoji=':metal:',
+        text=message
+    )
 
 
 def on_record():
+    """
+    Triggers the recording process. This will start the audio recording of a
+    file in a separate thread.
+
+    :return: nothing
+    """
     global on_air
     on_air = True
     global filename
     filename = time.strftime("%m-%d-%Y_%H%M") + ".wav"
-    t = threading.Thread(target=recording.record, args=(filename, is_on_air,))
+    t = threading.Thread(target=audio.record, args=(filename, lambda: on_air))
     t.start()
 
 
 def on_stop_record():
+    """
+    Stops the recording process. This will end the ongoing audio recording,
+    convert the recording to an MP3 file, and upload the file to Slack.
+
+    :return: nothing
+    """
     global on_air
     on_air = False
+    uploaded = False
 
-    mp3_filename = recording.convert(filename)
+    # seems to be a race condition if we immediately convert, give it a sec
+    time.sleep(3)
+
+    mp3_filename = audio.convert(filename)
 
     print('Uploading to Slack channel ', end='')
-    t = threading.Thread(target=spin, args=(spin_check,))
+    t = threading.Thread(target=spin, args=(lambda: uploaded, 'SERVED ON THE WEB',))
     t.start()
 
     my_file = {
@@ -63,81 +77,67 @@ def on_stop_record():
     }
 
     requests.post("https://slack.com/api/files.upload", params=payload, files=my_file)
-
-    print('DELIVERED')
+    uploaded = True
 
 
 @slack.RTMClient.run_on(event='hello')
 def on_connect(**payload):
+    """
+    Triggered upon connection to Slack. Sends a notification message.
+
+    :param payload: the Slack payload
+    :return: nothing
+    """
     global connected
     connected = True
-    web_client = payload['web_client']
-    web_client.chat_postMessage(
-        channel='GK6TLC48P',
-        icon_emoji=':metal:',
-        text='Jambot is ready for tasty licks'
-    )
+    post_message(payload['web_client'], 'Jambot is ready for tasty licks!')
 
 
 @slack.RTMClient.run_on(event='message')
 def on_message(**payload):
-    data = payload['data']
-    channel_id = data['channel']
-    web_client = payload['web_client']
-    if '!onstage' in data['text']:
+    """
+    Triggered upon Slack messages from users. Determines if the message was a
+    recognized command and performs the requested operation.
+
+    :param payload: the Slack payload
+    :return: nothing
+    """
+    message = payload['data']['text']
+    webclient = payload['web_client']
+    # start the recording
+    if '!onstage' in message:
         if on_air:
-            web_client.chat_postMessage(
-                channel=channel_id,
-                icon_emoji=':metal:',
-                text='Don\'t worry bro, the recording has already started'
-            )
+            post_message(webclient, "Don't worry bro, the recording has already started!")
         else:
-            web_client.chat_postMessage(
-                channel=channel_id,
-                icon_emoji=':metal:',
-                text='Let\'s rock! I\'m recording as we speak.'
-            )
-
+            post_message(webclient, "Let's rock! I'm recording as we speak...")
             on_record()
-    elif '!offstage' in data['text']:
+    # stop the recording
+    elif '!offstage' in message:
         if on_air:
-            web_client.chat_postMessage(
-                channel=channel_id,
-                icon_emoji=':metal:',
-                text='Nicely done. I\'m preparing that hot mix for consumption!'
-            )
-
+            post_message(webclient, "Nicely done! I'm preparing that hot mix for consumption...")
             on_stop_record()
         else:
-            web_client.chat_postMessage(
-                channel=channel_id,
-                icon_emoji=':metal:',
-                text='Was I supposed to be recording? Whoops...'
-            )
-    elif '!disk' in data['text']:
+            post_message(webclient, "Was I supposed to be recording? Cuz I have NOT been recording.")
+    # sends disk usage statistics
+    elif '!disk' in message:
         total, used, free = shutil.disk_usage(".")
-        web_client.chat_postMessage(
-            channel=channel_id,
-            icon_emoji=':metal:',
-            text='Let me check on that disk space. {:.2f} % used, {:.1f} gigs left.'.format(used / total, free / 1024 / 1024 / 1024)
-        )
-    elif '!cleanup' in data['text']:
-        removed = recording.cleanup()
-        web_client.chat_postMessage(
-            channel=channel_id,
-            icon_emoji=':metal:',
-            text='Let me clean that up for you. {} file(s) removed.'.format(removed)
-        )
-    elif '!shutdown' in data['text']:
-        web_client.chat_postMessage(
-            channel=channel_id,
-            icon_emoji=':metal:',
-            text='Yeah, I should get some rest.'
-        )
+        post_message(webclient, 'Let me check on that disk space. {:.2f} % used, {:.1f} gigs left.'.format(used / total, free / 1024 / 1024 / 1024))
+    # removes old audio files
+    elif '!cleanup' in message:
+        removed = audio.cleanup()
+        post_message(webclient, "Let me clean that up for you. {} file(s) removed.".format(removed))
+    # exits the application
+    elif '!shutdown' in message:
+        post_message(webclient, "Yeah, I should get some rest.")
         sys.exit(0)
 
 
 def init():
+    """
+    Initializes the Slack connection.
+
+    :return: nothing
+    """
     config = configparser.ConfigParser()
     config.read('config.ini')
     global token
@@ -146,7 +146,7 @@ def init():
     channel_id = config['slack']['channel']
 
     print('Plugging into the Slack channel ', end='')
-    t = threading.Thread(target=spin, args=(spin_check,))
+    t = threading.Thread(target=spin, args=(lambda: not connected, 'PLUGGED IN',))
     t.start()
     rtm_client = slack.RTMClient(token=token)
     rtm_client.start()

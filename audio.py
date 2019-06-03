@@ -3,8 +3,6 @@ from spinner import spin
 import sounddevice as sd
 import soundfile as sf
 import queue
-import sys
-import time
 import threading
 from pydub import AudioSegment
 import numpy  # Make sure NumPy is loaded before it is used in the callback
@@ -12,17 +10,22 @@ assert numpy  # avoid "imported but unused" message (W0611)
 
 
 def record(filename, on_air_callback):
+    """
+    Records an audio file based on the default input device
+
+    :param filename: the name of the audio file
+    :param on_air_callback: callback that should return True until recording should stop
+    :return: nothing
+    """
     device_info = sd.query_devices(None, 'input')
     samplerate = int(device_info['default_samplerate'])
     q = queue.Queue()
 
     def callback(indata, frames, time, status):
-        if status:
-            print(status, file=sys.stderr)
         q.put(indata.copy())
 
     print('Recording the goodness ', end='')
-    t = threading.Thread(target=spin, args=(on_air_callback,))
+    t = threading.Thread(target=spin, args=(on_air_callback, 'RECORDED'))
     t.start()
 
     # Make sure the file is opened before recording anything:
@@ -31,18 +34,18 @@ def record(filename, on_air_callback):
             while on_air_callback():
                 file.write(q.get())
 
-    print('WE GOING PLATINUM')
-
 
 def convert(filename):
+    """
+    Converts the provided WAV file into an MP3
+
+    :param filename: the name of the WAV file
+    :return: the name of the MP3 file
+    """
     converting = True
 
-    def mp3_callback():
-        return converting
-
     print('Converting to MP3 ', end='')
-    time.sleep(5)
-    t = threading.Thread(target=spin, args=(mp3_callback,))
+    t = threading.Thread(target=spin, args=(lambda: converting, 'CONVERTED',))
     t.start()
 
     mp3_filename = filename.replace(".wav", ".mp3")
@@ -53,6 +56,11 @@ def convert(filename):
 
 
 def cleanup():
+    """
+    Removes WAV/MP3 files in the current directory
+
+    :return: the number of files removed
+    """
     count = 0
     for file in os.listdir("."):
         if file.endswith(".wav") or file.endswith(".mp3"):
