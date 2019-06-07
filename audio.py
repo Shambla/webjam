@@ -9,6 +9,29 @@ import numpy  # Make sure NumPy is loaded before it is used in the callback
 assert numpy  # avoid "imported but unused" message (W0611)
 
 
+def active_device():
+    """
+    Returns the name of the active recording device
+
+    :return: the name of the active recording device
+    """
+    return sd.query_devices(None, 'input')['name']
+
+
+def list_devices():
+    """
+    Returns the string representation of all available devices
+
+    :return: the string representation of all available devices
+    """
+    device_list = ""
+    devices = sd.query_devices()
+    for device in devices:
+        device_list += device['name'] + " ({} in, {} out)\n".format(device['max_input_channels'], device['max_output_channels'])
+
+    return device_list
+
+
 def record(filename, on_air_callback):
     """
     Records an audio file based on the default input device

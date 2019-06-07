@@ -1,4 +1,5 @@
 from spinner import spin
+import datetime as dt
 import configparser
 import threading
 import time
@@ -68,11 +69,24 @@ def on_stop_record():
       'file': (mp3_filename, open(mp3_filename, 'rb'), 'wav')
     }
 
+    hour = dt.datetime.now().hour
+    title = dt.datetime.today().strftime('%A')
+
+    if hour > 4 and hour < 12:
+        title += ' Morning '
+    elif hour >= 12 and hour < 17:
+        title += ' Afternoon '
+    elif hour >= 17 and hour < 20:
+        title += ' Evening '
+    else:
+        title += ' Night '
+    title += 'Jam'
+
     payload = {
         "channels": [channel_id],
-        'initial_comment': '...and there it is',
+        'initial_comment': '...and here it is',
         "filename": mp3_filename,
-        'title': 'Latest Jam',
+        'title': title,
         "token": token,
     }
 
@@ -109,7 +123,7 @@ def on_message(**payload):
         if on_air:
             post_message(webclient, "Don't worry bro, the recording has already started!")
         else:
-            post_message(webclient, "Let's rock! I'm recording as we speak...")
+            post_message(webclient, "Let's rock! I'm recording as we speak using the " + audio.active_device())
             on_record()
     # stop the recording
     elif '!offstage' in message:
@@ -122,6 +136,9 @@ def on_message(**payload):
     elif '!disk' in message:
         total, used, free = shutil.disk_usage(".")
         post_message(webclient, 'Let me check on that disk space. {:.2f} % used, {:.1f} gigs left.'.format(used / total, free / 1024 / 1024 / 1024))
+    # sends device information
+    elif '!devices' in message:
+        post_message(webclient, 'Look at all these options:\n```' + audio.list_devices() + '```')
     # removes old audio files
     elif '!cleanup' in message:
         removed = audio.cleanup()
