@@ -52,8 +52,8 @@ def record(filename, on_air_callback):
     t.start()
 
     # Make sure the file is opened before recording anything:
-    with sf.SoundFile(filename, mode='x', samplerate=samplerate, channels=1, subtype=None) as file:
-        with sd.InputStream(samplerate=samplerate, channels=1, device=None, callback=callback):
+    with sf.SoundFile(filename, mode='x', samplerate=samplerate, channels=2, subtype=None) as file:
+        with sd.InputStream(samplerate=samplerate, channels=2, device=None, callback=callback):
             while on_air_callback():
                 file.write(q.get())
 

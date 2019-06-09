@@ -119,32 +119,32 @@ def on_message(**payload):
     message = payload['data']['text']
     webclient = payload['web_client']
     # start the recording
-    if '!onstage' in message:
+    if 'onstage' in message:
         if on_air:
             post_message(webclient, "Don't worry bro, the recording has already started!")
         else:
             post_message(webclient, "Let's rock! I'm recording as we speak using the " + audio.active_device())
             on_record()
     # stop the recording
-    elif '!offstage' in message:
+    elif 'offstage' in message:
         if on_air:
             post_message(webclient, "Nicely done! I'm preparing that hot mix for consumption...")
             on_stop_record()
         else:
             post_message(webclient, "Was I supposed to be recording? Cuz I have NOT been recording.")
     # sends disk usage statistics
-    elif '!disk' in message:
+    elif 'disk' in message:
         total, used, free = shutil.disk_usage(".")
         post_message(webclient, 'Let me check on that disk space. {:.2f} % used, {:.1f} gigs left.'.format(used / total, free / 1024 / 1024 / 1024))
     # sends device information
-    elif '!devices' in message:
+    elif 'devices' in message:
         post_message(webclient, 'Look at all these options:\n```' + audio.list_devices() + '```')
     # removes old audio files
-    elif '!cleanup' in message:
+    elif 'cleanup' in message:
         removed = audio.cleanup()
         post_message(webclient, "Let me clean that up for you. {} file(s) removed.".format(removed))
     # exits the application
-    elif '!shutdown' in message:
+    elif 'shutdown' in message:
         post_message(webclient, "Yeah, I should get some rest.")
         sys.exit(0)
 
