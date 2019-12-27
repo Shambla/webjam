@@ -105,6 +105,7 @@ def on_connect(**payload):
     global connected
     connected = True
     post_message(payload['web_client'], 'Jambot is ready for tasty licks!')
+    print('\a')
 
 
 @slack.RTMClient.run_on(event='message')
@@ -116,19 +117,28 @@ def on_message(**payload):
     :param payload: the Slack payload
     :return: nothing
     """
+    user = payload['data'].get('username')
     message = payload['data']['text'].lower()
     webclient = payload['web_client']
+
+    # IFTTT sends message in separate field
+    if user is not None and 'IFTTT' in user:
+        print('in here!')
+        message = payload['data']['attachments'][0]['pretext'].lower()
+
     # start the recording
     if 'onstage' in message:
         if on_air:
             post_message(webclient, "Don't worry bro, the recording has already started!")
         else:
             post_message(webclient, "Let's rock! I'm recording as we speak using the " + audio.active_device())
+            print('\a')
             on_record()
     # stop the recording
     elif 'offstage' in message:
         if on_air:
             post_message(webclient, "Nicely done! I'm preparing that hot mix for consumption...")
+            print('\a')
             on_stop_record()
         else:
             post_message(webclient, "Was I supposed to be recording? Cuz I have NOT been recording.")
