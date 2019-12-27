@@ -116,7 +116,7 @@ def on_message(**payload):
     :param payload: the Slack payload
     :return: nothing
     """
-    message = payload['data']['text']
+    message = payload['data']['text'].lower()
     webclient = payload['web_client']
     # start the recording
     if 'onstage' in message:
