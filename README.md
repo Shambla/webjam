@@ -4,7 +4,7 @@
 
 Artists have sketchbooks, writers have notebooks, but what do musicians have? ~~Jambooks~~ Webjam of course!
 
-Webjam - is a shoddy amalgamation of Python files which aims to capture your musical ramblings in
+Webjam is a shoddy amalgamation of Python files which aims to capture your musical ramblings in
 a rough format, prioritizing ease-of-use over fidelity.
 
 ## How it works
